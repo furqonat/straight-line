@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use tokio_postgres::{types::ToSql, Row};
+use security::env::{Env, EnvImpl};
+use tokio_postgres::{types::ToSql, NoTls, Row};
 
 use crate::db::Database;
 
@@ -8,21 +9,35 @@ pub struct Postgresql {
 }
 
 impl Postgresql {
-    pub fn new(client: tokio_postgres::Client) -> Self {
+    pub async fn new(env: EnvImpl) -> Self {
+        let db_url = env.get(&security::env::EnvConfig::DatabaseUrl);
+        if db_url.is_none() {
+            panic!("DATABASE_URL is not set");
+        }
+        let (client, connection) = tokio_postgres::connect(&db_url.unwrap(), NoTls)
+            .await
+            .expect("Unable to connect to database");
+
+        // Spawn the database connection handler in the background
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Database connection error: {}", e);
+            }
+        });
         Postgresql { client }
     }
 }
 
 #[async_trait]
 impl Database for Postgresql {
-    async fn query<'a>(
+    async fn query(
         &self,
         sql: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, tokio_postgres::Error> {
         return self.client.query(sql, params).await;
     }
-    async fn query_one<'a>(
+    async fn query_one(
         &self,
         sql: &str,
         params: &[&(dyn ToSql + Sync)],

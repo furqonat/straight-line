@@ -1,3 +1,4 @@
+use dotenv::dotenv;
 use mockall::automock;
 
 pub enum EnvConfig {
@@ -15,10 +16,12 @@ pub struct EnvImpl;
 
 impl Env for EnvImpl {
     fn get(&self, key: &EnvConfig) -> Option<String> {
-        dotenv::dotenv().ok();
+        dotenv()
+            .inspect_err(|_| println!("Failed to read .env file"))
+            .ok();
 
         match key {
-            EnvConfig::SecretKey => std::env::var("SECRET_KEY").ok(),
+            EnvConfig::SecretKey => std::env::var("JWT_SECRET").ok(),
             EnvConfig::DatabaseUrl => std::env::var("DATABASE_URL").ok(),
         }
     }

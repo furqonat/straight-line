@@ -3,30 +3,14 @@ use controllers::auth_controller::auth_controller;
 use database::pgx::Postgresql;
 use security::{env::EnvImpl, hasher::Bcrypt, jwt::JwtImpl};
 use services::auth_service::AuthServiceImpl;
-use tokio_postgres::NoTls;
 
 pub mod controllers;
 pub mod services;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let (client, connection) = tokio_postgres::connect(
-        "host=localhost user=postgres password=postgres port=5432 dbname=postgres",
-        NoTls,
-    )
-    .await
-    .expect("Unable to connect to database");
-
-    // Spawn the database connection handler in the background
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Database connection error: {}", e);
-        }
-    });
-
-    // Initialize other components
     let jwt = JwtImpl::new(EnvImpl::default());
-    let database = Postgresql::new(client);
+    let database = Postgresql::new(EnvImpl::default()).await;
     let bcrypt = Bcrypt::default();
     let auth_service = AuthServiceImpl::new(database, bcrypt, jwt);
 

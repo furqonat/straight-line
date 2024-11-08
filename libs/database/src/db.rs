@@ -3,13 +3,13 @@ use tokio_postgres::{types::ToSql, Row};
 
 #[async_trait]
 pub trait Database {
-    async fn query<'a>(
+    async fn query(
         &self,
         sql: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, tokio_postgres::Error>;
 
-    async fn query_one<'a>(
+    async fn query_one(
         &self,
         sql: &str,
         params: &[&(dyn ToSql + Sync)],

@@ -1,17 +1,15 @@
 {
-  "name": "apps_auth_auth",
-  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "name": "auth",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "sourceRoot": "apps/apps/auth/auth/src",
+  "sourceRoot": "apps/auth/src",
   "targets": {
     "build": {
       "cache": true,
       "executor": "@monodon/rust:build",
-      "outputs": [
-        "{options.target-dir}"
-      ],
+      "outputs": ["{options.target-dir}"],
       "options": {
-        "target-dir": "dist/target/apps_auth_auth"
+        "target-dir": "dist/target/auth"
       },
       "configurations": {
         "production": {
@@ -22,11 +20,9 @@
     "test": {
       "cache": true,
       "executor": "@monodon/rust:test",
-      "outputs": [
-        "{options.target-dir}"
-      ],
+      "outputs": ["{options.target-dir}"],
       "options": {
-        "target-dir": "dist/target/apps_auth_auth"
+        "target-dir": "dist/target/auth"
       },
       "configurations": {
         "production": {
@@ -37,20 +33,16 @@
     "lint": {
       "cache": true,
       "executor": "@monodon/rust:lint",
-      "outputs": [
-        "{options.target-dir}"
-      ],
+      "outputs": ["{options.target-dir}"],
       "options": {
-        "target-dir": "dist/target/apps_auth_auth"
+        "target-dir": "dist/target/auth"
       }
     },
     "run": {
       "executor": "@monodon/rust:run",
-      "outputs": [
-        "{options.target-dir}"
-      ],
+      "outputs": ["{options.target-dir}"],
       "options": {
-        "target-dir": "dist/target/apps_auth_auth"
+        "target-dir": "dist/target/auth"
       },
       "configurations": {
         "production": {
