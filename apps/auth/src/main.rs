@@ -4,8 +4,10 @@ use database::pgx::Postgresql;
 use security::{env::EnvImpl, hasher::Bcrypt, jwt::JwtImpl};
 use services::auth_service::AuthServiceImpl;
 
-pub mod controllers;
-pub mod services;
+mod controllers;
+mod middlewares;
+mod services;
+mod utils;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
