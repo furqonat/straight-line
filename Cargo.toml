@@ -5,6 +5,7 @@ members = [
 	'apps/auth',
 	'libs/security',
 	'libs/database',
+	'libs/logger',
 ]
 
 [profile.release]
