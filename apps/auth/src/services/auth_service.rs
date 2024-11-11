@@ -7,6 +7,8 @@ use security::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::utils::constants::{AUTH_TOKEN, REFRESH_TOKEN};
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenData {
     pub token: String,
@@ -72,21 +74,21 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
                     let token = self.jwt.sign(&Claims {
                         sub: username.clone(),
                         iat: Utc::now().timestamp() as usize,
-                        aud: username.clone(),
                         exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,
                         nbf: Utc::now().timestamp() as usize,
                         additional_claims: AdditionalClaims {
                             user_id: user_id.clone(),
+                            kind: AUTH_TOKEN.to_string(),
                         },
                     });
                     let refresh_token = self.jwt.sign(&Claims {
                         sub: username.clone(),
                         iat: Utc::now().timestamp() as usize,
-                        aud: username.clone(),
                         exp: (Utc::now() + Duration::weeks(4)).timestamp() as usize,
                         nbf: Utc::now().timestamp() as usize,
                         additional_claims: AdditionalClaims {
                             user_id: user_id.clone(),
+                            kind: REFRESH_TOKEN.to_string(),
                         },
                     });
 
@@ -138,11 +140,11 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
             let claims = Claims {
                 sub: old_claims.sub.clone(),
                 iat: Utc::now().timestamp() as usize,
-                aud: old_claims.aud.clone(),
                 exp: expired,
                 nbf: Utc::now().timestamp() as usize,
                 additional_claims: AdditionalClaims {
                     user_id: old_claims.additional_claims.user_id.clone(),
+                    kind: old_claims.additional_claims.kind.clone(),
                 },
             };
 

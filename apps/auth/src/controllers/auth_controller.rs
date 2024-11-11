@@ -1,9 +1,13 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpMessage, HttpRequest, HttpResponse};
 use database::pgx::Postgresql;
 use security::{env::EnvImpl, hasher::Bcrypt, jwt::JwtImpl};
 use serde::{Deserialize, Serialize};
 
-use crate::services::auth_service::{AuthService, AuthServiceImpl};
+use crate::{
+    middlewares,
+    services::auth_service::{AuthService, AuthServiceImpl},
+    utils,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ResponseOk<T> {
@@ -17,11 +21,18 @@ struct ResponseError {
 }
 
 pub fn auth_controller(config: &mut web::ServiceConfig) {
+    let refresh_middeware = middlewares::refresh_middleware::Middleware {
+        roles: vec![utils::constants::REFRESH_TOKEN.to_string()],
+    };
     config.service(
         web::scope("/auth")
             .route("/signup", web::post().to(sign_up_handler))
             .route("/signin", web::post().to(sign_in_handler))
-            .route("/refresh-token", web::post().to(refresh_token_handler)),
+            .service(
+                web::scope("/refresh-token")
+                    .wrap(refresh_middeware)
+                    .route("", web::get().to(refresh_token_handler)),
+            ),
     );
 }
 
@@ -64,21 +75,26 @@ async fn sign_in_handler(
     }
 }
 
-// TODO: add middleware to check if user is have header Authorization-refresh
 async fn refresh_token_handler(
-    data: web::Json<crate::services::auth_service::GainNewTokenData>,
     ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>>>,
+    req: HttpRequest,
 ) -> HttpResponse {
-    match ctrl.gain_new_token(&data.old_token).await {
-        Ok(Some(token)) => HttpResponse::Ok().json(ResponseOk {
-            data: Some(token),
-            message: "Successfully refreshed token".to_string(),
-        }),
-        Ok(None) => HttpResponse::BadRequest().json(ResponseError {
-            message: "Failed to refresh token".to_string(),
-        }),
-        Err(err) => HttpResponse::InternalServerError().json(ResponseError {
-            message: format!("Error: {}", err),
-        }),
+    if let Some(token) = req.extensions().get::<String>() {
+        match ctrl.gain_new_token(token).await {
+            Ok(Some(new_token)) => HttpResponse::Ok().json(ResponseOk {
+                data: Some(new_token),
+                message: "Successfully refreshed token".to_string(),
+            }),
+            Ok(None) => HttpResponse::BadRequest().json(ResponseError {
+                message: "Failed to refresh token".to_string(),
+            }),
+            Err(err) => HttpResponse::InternalServerError().json(ResponseError {
+                message: format!("Error: {}", err),
+            }),
+        }
+    } else {
+        HttpResponse::BadRequest().json(ResponseError {
+            message: "Token not found in request".to_string(),
+        })
     }
 }
