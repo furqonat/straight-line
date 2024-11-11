@@ -31,7 +31,7 @@ pub fn auth_controller(config: &mut web::ServiceConfig) {
             .service(
                 web::scope("/refresh-token")
                     .wrap(refresh_middeware)
-                    .route("", web::post().to(refresh_token_handler)),
+                    .route("", web::get().to(refresh_token_handler)),
             ),
     );
 }
