@@ -8,6 +8,7 @@ edition = "2021"
 mockall = "0.13"
 database = { path = "../../libs/database" }
 security = { path = "../../libs/security" }
+logger = { path = "../../libs/logger" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
 chrono = "0.4.38"

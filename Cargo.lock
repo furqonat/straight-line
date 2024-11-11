@@ -278,6 +278,7 @@ dependencies = [
  "chrono",
  "database",
  "futures",
+ "logger",
  "mockall",
  "security",
  "serde",

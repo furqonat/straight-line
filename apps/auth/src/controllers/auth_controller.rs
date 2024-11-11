@@ -1,5 +1,6 @@
 use actix_web::{web, HttpMessage, HttpRequest, HttpResponse};
 use database::pgx::Postgresql;
+use logger::log::Log;
 use security::{env::EnvImpl, hasher::Bcrypt, jwt::JwtImpl};
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +39,7 @@ pub fn auth_controller(config: &mut web::ServiceConfig) {
 
 async fn sign_up_handler(
     data: web::Json<crate::services::auth_service::SignUpData>,
-    ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>>>,
+    ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>, Log>>,
 ) -> HttpResponse {
     match ctrl.sign_up(&data).await {
         Ok(Some(user_id)) => HttpResponse::Ok().json(ResponseOk {
@@ -56,7 +57,7 @@ async fn sign_up_handler(
 
 async fn sign_in_handler(
     data: web::Json<crate::services::auth_service::SignInData>,
-    ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>>>,
+    ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>, Log>>,
 ) -> HttpResponse {
     match ctrl.sign_in(&data).await {
         Ok(Some(token)) => HttpResponse::Ok().json(ResponseOk {
@@ -76,7 +77,7 @@ async fn sign_in_handler(
 }
 
 async fn refresh_token_handler(
-    ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>>>,
+    ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>, Log>>,
     req: HttpRequest,
 ) -> HttpResponse {
     if let Some(token) = req.extensions().get::<String>() {

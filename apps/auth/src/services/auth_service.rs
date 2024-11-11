@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use database::db::Database;
+use logger::logger::Logger;
 use security::{
     hasher::Hasher,
     jwt::{AdditionalClaims, Claims, Jwt},
@@ -41,23 +42,35 @@ pub trait AuthService {
     async fn gain_new_token(&self, old_token: &str) -> Result<Option<String>, String>;
 }
 
-pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt> {
+pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger> {
     db: T,
     hasher: B,
     jwt: E,
+    logger: L,
 }
 
-impl<T: Database, B: Hasher, E: Jwt> AuthServiceImpl<T, B, E> {
-    pub fn new(db: T, hasher: B, jwt: E) -> Self {
-        Self { db, hasher, jwt }
+impl<T: Database, B: Hasher, E: Jwt, L: Logger> AuthServiceImpl<T, B, E, L> {
+    pub fn new(db: T, hasher: B, jwt: E, logger: L) -> Self {
+        Self {
+            db,
+            hasher,
+            jwt,
+            logger,
+        }
     }
 }
 
 #[async_trait]
-impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> AuthService
-    for AuthServiceImpl<T, B, E>
+impl<
+        T: Database + Send + Sync,
+        B: Hasher + Send + Sync,
+        E: Jwt + Send + Sync,
+        L: Logger + Send + Sync,
+    > AuthService for AuthServiceImpl<T, B, E, L>
 {
     async fn sign_in(&self, data: &SignInData) -> Result<Option<TokenData>, String> {
+        self.logger
+            .info("auth_service::sign_in", "sign in is initialized");
         let row = self
             .db
             .query_one(
@@ -67,10 +80,18 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
             .await;
         match row {
             Ok(row) => {
+                self.logger
+                    .info("auth_service::sign_in", "user found in database");
                 let user_id: String = row.get(0);
                 let username: String = row.get(1);
                 let password: String = row.get(2);
+                self.logger
+                    .info("auth_service::sign_in", "trying to verify password");
                 if self.hasher.verify(&data.password, &password) {
+                    self.logger
+                        .info("auth_service::sign_in", "password verified");
+                    self.logger
+                        .info("auth_service::sign_in", "creating a token");
                     let token = self.jwt.sign(&Claims {
                         sub: username.clone(),
                         iat: Utc::now().timestamp() as usize,
@@ -81,6 +102,8 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
                             kind: AUTH_TOKEN.to_string(),
                         },
                     });
+                    self.logger
+                        .info("auth_service::sign_in", "creating a refresh token");
                     let refresh_token = self.jwt.sign(&Claims {
                         sub: username.clone(),
                         iat: Utc::now().timestamp() as usize,
@@ -98,17 +121,24 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
                     };
                     Ok(Some(token_data))
                 } else {
+                    self.logger
+                        .error("auth_service::sign_in", "password is not match");
                     Ok(None)
                 }
             }
             Err(e) => {
-                println!("Error: {}", e);
+                let message = format!("an error occurred: {}", e);
+                self.logger.error("auth_service::sign_in", &message);
                 Ok(None)
             }
         }
     }
 
     async fn sign_up(&self, data: &SignUpData) -> Result<Option<String>, String> {
+        self.logger.info(
+            "auth_service::sign_up",
+            "sign up is initialized and querying database",
+        );
         let row = self
             .db
             .query_one(
@@ -117,9 +147,14 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
             )
             .await;
         match row {
-            Ok(row) => Ok(Some(row.get(0))),
+            Ok(row) => {
+                self.logger
+                    .info("auth_service::sign_up", "user created in database");
+                Ok(Some(row.get(0)))
+            }
             Err(e) => {
-                println!("Error: {}", e);
+                let message = format!("an error occurred: {}", e);
+                self.logger.error("auth_service::sign_up", &message);
                 Ok(None)
             }
         }
@@ -127,8 +162,14 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
 
     async fn gain_new_token(&self, old_token: &str) -> Result<Option<String>, String> {
         if self.jwt.verify(&old_token) {
+            self.logger
+                .info("auth_service::gain_new_token", "old token is valid");
             let old_token_claims = self.jwt.extract(&old_token);
             if old_token_claims.is_none() {
+                self.logger.error(
+                    "auth_service::gain_new_token",
+                    "failed to extract claims from token",
+                );
                 return Ok(None);
             }
 
@@ -150,9 +191,14 @@ impl<T: Database + Send + Sync, B: Hasher + Send + Sync, E: Jwt + Send + Sync> A
 
             // Sign a new token with updated claims
             let new_token = self.jwt.sign(&claims);
-
+            self.logger.info(
+                "auth_service::gain_new_token",
+                "new token is created successfully",
+            );
             Ok(Some(new_token))
         } else {
+            self.logger
+                .error("auth_service::gain_new_token", "old token is not valid");
             Ok(None)
         }
     }

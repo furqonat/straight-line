@@ -5,6 +5,7 @@ use actix_web::{
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
+use logger::{log::Log, logger::Logger};
 use security::{
     env::EnvImpl,
     jwt::{Jwt, JwtImpl},
@@ -33,6 +34,7 @@ where
             service,
             roles: self.roles.clone(),
             jwt: JwtImpl::new(EnvImpl::default()),
+            logger: Log::default(),
         }))
     }
 }
@@ -41,6 +43,7 @@ pub struct RefreshTokenMiddleware<S> {
     service: S,
     roles: Vec<String>,
     jwt: JwtImpl<EnvImpl>,
+    logger: Log,
 }
 
 impl<S, B> Service<ServiceRequest> for RefreshTokenMiddleware<S>
@@ -56,17 +59,26 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        println!("RefreshTokenMiddleware: executing middleware");
+        self.logger.info(
+            "RefreshTokenMiddleware::call",
+            "RefreshTokenMiddleware: executing middleware",
+        );
 
         // Check if roles exist in middleware
         if !self.roles.is_empty() {
-            println!("RefreshTokenMiddleware: checking roles");
+            self.logger.info(
+                "RefreshTokenMiddleware::call",
+                "RefreshTokenMiddleware: checking roles",
+            );
 
             // Try to get the Authorization-refresh header
             let token_header = req.headers().get("Authorization-refresh");
 
             if token_header.is_none() {
-                println!("RefreshTokenMiddleware: missing Authorization-refresh header");
+                self.logger.error(
+                    "RefreshTokenMiddleware::call",
+                    "RefreshTokenMiddleware: missing Authorization-refresh header",
+                );
                 return Box::pin(ready(Err(actix_web::error::ErrorUnauthorized(
                     "Unauthorized: Missing Authorization-refresh header",
                 ))));
@@ -76,7 +88,10 @@ where
             // split Bearer from token
             let token_str = token_str.map(|s| s.split("Bearer ").collect::<Vec<_>>()[1]);
             if token_str.is_err() {
-                println!("RefreshTokenMiddleware: invalid token format");
+                self.logger.error(
+                    "RefreshTokenMiddleware::call",
+                    "RefreshTokenMiddleware: invalid token format",
+                );
                 return Box::pin(ready(Err(actix_web::error::ErrorUnauthorized(
                     "Unauthorized: Invalid token format",
                 ))));
@@ -87,7 +102,10 @@ where
             // Validate JWT token
             let claims = self.jwt.extract(&token);
             if claims.is_none() {
-                println!("RefreshTokenMiddleware: failed to extract token claims");
+                self.logger.error(
+                    "RefreshTokenMiddleware::call",
+                    "RefreshTokenMiddleware: failed to extract token claims",
+                );
                 return Box::pin(ready(Err(actix_web::error::ErrorUnauthorized(
                     "Unauthorized: Invalid or expired token",
                 ))));
@@ -97,7 +115,10 @@ where
 
             // Validate role
             if !roles_is_valid(&self.roles, &claims.additional_claims.kind) {
-                println!("RefreshTokenMiddleware: unauthorized role");
+                self.logger.error(
+                    "RefreshTokenMiddleware::call",
+                    "RefreshTokenMiddleware: unauthorized role",
+                );
                 return Box::pin(ready(Err(actix_web::error::ErrorUnauthorized(
                     "Unauthorized: Invalid role",
                 ))));
@@ -105,13 +126,19 @@ where
 
             // Check if the token is of the type REFRESH_TOKEN
             if claims.additional_claims.kind != utils::constants::REFRESH_TOKEN {
-                println!("RefreshTokenMiddleware: invalid token type");
+                self.logger.error(
+                    "RefreshTokenMiddleware::call",
+                    "RefreshTokenMiddleware: invalid token type",
+                );
                 return Box::pin(ready(Err(actix_web::error::ErrorUnauthorized(
                     "Unauthorized: Token is not a refresh token",
                 ))));
             }
 
-            println!("RefreshTokenMiddleware: token and role validated");
+            self.logger.info(
+                "RefreshTokenMiddleware::call",
+                "RefreshTokenMiddleware: token and role validated",
+            );
 
             // Attach token to request extensions for future use
             req.extensions_mut().insert(token.to_string());
@@ -122,8 +149,6 @@ where
 
         Box::pin(async move {
             let res = fut.await?;
-
-            println!("RefreshTokenMiddleware: after request processing");
 
             Ok(res)
         })

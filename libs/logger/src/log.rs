@@ -1,31 +1,47 @@
-use crate::logger::{Logger, LoggerConfig};
+use crate::logger::LogLevel;
+use crate::logger::Logger;
 
-pub struct Log {
-    pub config: Option<LoggerConfig>,
-}
-
-#[allow(dead_code)]
-impl Log {
-    fn new(config: Option<LoggerConfig>) -> Self {
-        Self { config }
-    }
-}
+#[derive(Debug, Default)]
+pub struct Log;
 
 impl Logger for Log {
     #[cfg(debug_assertions)]
-    fn info(&self, level: &crate::logger::LogLevel, message: &str) {
-        println!("{}: {}", level, message);
+    fn info(&self, tag: &str, message: &str) {
+        println!("{}: {}, {}", LogLevel::Info, tag, message);
     }
 
-    fn error(&self, level: &crate::logger::LogLevel, message: &str) {
-        print!("{}: {}", level, message);
+    #[cfg(debug_assertions)]
+    fn error(&self, tag: &str, message: &str) {
+        println!("{}: {}, {}", LogLevel::Error, tag, message);
     }
 
-    fn warn(&self, level: &crate::logger::LogLevel, message: &str) {
-        print!("{}: {}", level, message);
+    #[cfg(debug_assertions)]
+    fn warn(&self, tag: &str, message: &str) {
+        println!("{}: {}, {}", LogLevel::Warn, tag, message);
     }
 
-    fn debug(&self, level: &crate::logger::LogLevel, message: &str) {
-        print!("{}: {}", level, message);
+    #[cfg(debug_assertions)]
+    fn debug(&self, tag: &str, message: &str) {
+        println!("{}: {}, {}", LogLevel::Debug, tag, message);
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn info(&self, _tag: &str, _message: &str) {
+        // Do nothing or implement a release logging mechanism
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn error(&self, _tag: &str, _message: &str) {
+        // Do nothing or implement a release logging mechanism
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn warn(&self, _tag: &str, _message: &str) {
+        // Do nothing or implement a release logging mechanism
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn debug(&self, _tag: &str, _message: &str) {
+        // Do nothing or implement a release logging mechanism
     }
 }

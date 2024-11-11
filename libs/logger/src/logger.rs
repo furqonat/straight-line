@@ -1,7 +1,6 @@
 use colored::*;
 use std::fmt::{self, Display};
 
-#[allow(dead_code)]
 pub enum LogLevel {
     Info,
     Error,
@@ -21,15 +20,9 @@ impl Display for LogLevel {
     }
 }
 
-#[allow(dead_code)]
 pub trait Logger {
-    fn info(&self, level: &LogLevel, message: &str);
-    fn error(&self, level: &LogLevel, message: &str);
-    fn warn(&self, level: &LogLevel, message: &str);
-    fn debug(&self, level: &LogLevel, message: &str);
-}
-
-pub struct LoggerConfig {
-    pub save_to_file: bool,
-    pub path: Option<String>,
+    fn info(&self, tag: &str, message: &str);
+    fn error(&self, tag: &str, message: &str);
+    fn warn(&self, tag: &str, message: &str);
+    fn debug(&self, tag: &str, message: &str);
 }
