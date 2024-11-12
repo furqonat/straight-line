@@ -4,11 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rand = "0.8"
 mockall = "0.13"
 bcrypt = "0.15"
 dotenv = "0.15"
 jsonwebtoken = "9"
-# If you do not need pem decoding, you can disable the default feature `use_pem` that way:
-# jsonwebtoken = {version = "9", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use jsonwebtoken::Header;
 use mockall::automock;
 use serde::{Deserialize, Serialize};
@@ -16,6 +18,7 @@ pub struct Claims {
     pub iat: usize, // Optional. Issued at (as UTC timestamp)
     pub nbf: usize, // Optional. Not Before (as UTC timestamp)
     pub sub: String, // Optional. Subject (whom token refers to)
+    pub jti: String, // Optional. JWT ID
     pub additional_claims: AdditionalClaims,
 }
 

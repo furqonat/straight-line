@@ -4,6 +4,7 @@ use mockall::automock;
 pub enum EnvConfig {
     SecretKey,
     DatabaseUrl,
+    RedisUrl,
 }
 
 #[automock]
@@ -23,6 +24,7 @@ impl Env for EnvImpl {
         match key {
             EnvConfig::SecretKey => std::env::var("JWT_SECRET").ok(),
             EnvConfig::DatabaseUrl => std::env::var("DATABASE_URL").ok(),
+            EnvConfig::RedisUrl => std::env::var("REDIS_URL").ok(),
         }
     }
 }
