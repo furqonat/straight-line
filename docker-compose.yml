@@ -14,7 +14,17 @@ services:
     ports:
       - 6379:6379
     restart: always
-    
+
+  auth:
+    build: 
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    ports:
+      - 8080:3001
+    depends_on:
+      - postgres
+      - redis
+  
 networks:
   default:
     driver: bridge

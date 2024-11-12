@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
-use database::{db::Database, redis::Redis};
+use database::{db::Database, pgx::PgRow, redis::Redis};
 use logger::logger::Logger;
 use security::{
     hasher::Hasher,
@@ -43,7 +43,7 @@ pub trait AuthService {
     async fn gain_new_token(&self, old_token: &str) -> Result<Option<String>, String>;
 }
 
-pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> {
+pub struct AuthServiceImpl<T: Database<PgRow>, B: Hasher, E: Jwt, L: Logger, R: Redis> {
     db: T,
     hasher: B,
     jwt: E,
@@ -51,7 +51,7 @@ pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> 
     redis: R,
 }
 
-impl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> AuthServiceImpl<T, B, E, L, R> {
+impl<T: Database<PgRow>, B: Hasher, E: Jwt, L: Logger, R: Redis> AuthServiceImpl<T, B, E, L, R> {
     pub fn new(db: T, hasher: B, jwt: E, logger: L, redis: R) -> Self {
         Self {
             db,
@@ -65,7 +65,7 @@ impl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> AuthServiceImpl<T, B, 
 
 #[async_trait]
 impl<
-        T: Database + Send + Sync,
+        T: Database<PgRow> + Send + Sync,
         B: Hasher + Send + Sync,
         E: Jwt + Send + Sync,
         L: Logger + Send + Sync,
@@ -148,7 +148,7 @@ impl<
         let row = self
             .db
             .query_one(
-                "INSERT INTO users (name, username, password) VALUES ($1, $2, $3, $4) RETURNING username",
+                "INSERT INTO users (name, username, password) VALUES ($1, $2, $3) RETURNING username",
                 &[&data.name,  &data.username, &self.hasher.hash(&data.password)],
             )
             .await;

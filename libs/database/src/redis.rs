@@ -1,9 +1,11 @@
+use mockall::automock;
 use redis::{Client, Commands};
 use security::env::{Env, EnvConfig, EnvImpl};
 
+#[automock]
 pub trait Redis {
     fn set(&self, key: &str, value: &str) -> Result<(), String>;
-    fn get(&self, key: &str) -> Result<String, String>;
+    fn get(&self, key: &str) -> Result<Option<String>, String>;
 }
 
 pub struct RedisImpl {
@@ -31,12 +33,15 @@ impl Redis for RedisImpl {
         Ok(())
     }
 
-    fn get(&self, key: &str) -> Result<String, String> {
+    fn get(&self, key: &str) -> Result<Option<String>, String> {
         let mut connection = self
             .client
             .get_connection()
             .expect("Failed to get connection from client");
-        let value: String = connection.get(key).expect("Failed to get value");
-        Ok(value)
+        let value = connection.get(key);
+        if value.is_err() {
+            return Err("Failed to get value".to_string());
+        }
+        Ok(Some(value.unwrap()))
     }
 }
