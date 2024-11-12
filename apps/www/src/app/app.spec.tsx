@@ -20,6 +20,8 @@ describe('App', () => {
         <App />
       </BrowserRouter>
     )
-    expect(getByText(/App Page/gi)).toBeTruthy()
+    expect(
+      getByText(/Straight Line just messaging without any data collection./gi)
+    ).toBeTruthy()
   })
 })
