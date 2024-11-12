@@ -1,12 +1,7 @@
 
 [workspace]
 resolver = '2'
-members = [
-	'apps/auth',
-	'libs/security',
-	'libs/database',
-	'libs/logger',
-]
+members = ['apps/auth', 'libs/security', 'libs/database', 'libs/logger']
 
 [profile.release]
 lto = true
