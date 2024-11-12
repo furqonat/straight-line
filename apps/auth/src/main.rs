@@ -1,6 +1,6 @@
 use actix_web::{web, App, HttpServer};
 use controllers::auth_controller::auth_controller;
-use database::pgx::Postgresql;
+use database::{pgx::Postgresql, redis::RedisImpl};
 use logger::log::Log;
 use security::{env::EnvImpl, hasher::Bcrypt, jwt::JwtImpl};
 use services::auth_service::AuthServiceImpl;
@@ -16,7 +16,8 @@ async fn main() -> std::io::Result<()> {
     let database = Postgresql::new(EnvImpl::default()).await;
     let bcrypt = Bcrypt::default();
     let logger = Log::default();
-    let auth_service = AuthServiceImpl::new(database, bcrypt, jwt, logger);
+    let redis = RedisImpl::new(EnvImpl::default());
+    let auth_service = AuthServiceImpl::new(database, bcrypt, jwt, logger, redis);
 
     // Share the auth service instance with all handlers using web::Data
     let auth_service_data = web::Data::new(auth_service);

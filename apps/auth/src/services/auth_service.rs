@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
-use database::db::Database;
+use database::{db::Database, redis::Redis};
 use logger::logger::Logger;
 use security::{
     hasher::Hasher,
     jwt::{AdditionalClaims, Claims, Jwt},
+    uuid::uuid_v4,
 };
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +26,6 @@ pub struct SignInData {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SignUpData {
     pub name: String,
-    pub email: String,
     pub username: String,
     pub password: String,
 }
@@ -39,23 +39,26 @@ pub struct GainNewTokenData {
 pub trait AuthService {
     async fn sign_in(&self, data: &SignInData) -> Result<Option<TokenData>, String>;
     async fn sign_up(&self, data: &SignUpData) -> Result<Option<String>, String>;
+    async fn sign_out(&self, token: &str, refresh_token: &str) -> Result<Option<String>, String>;
     async fn gain_new_token(&self, old_token: &str) -> Result<Option<String>, String>;
 }
 
-pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger> {
+pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> {
     db: T,
     hasher: B,
     jwt: E,
     logger: L,
+    redis: R,
 }
 
-impl<T: Database, B: Hasher, E: Jwt, L: Logger> AuthServiceImpl<T, B, E, L> {
-    pub fn new(db: T, hasher: B, jwt: E, logger: L) -> Self {
+impl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> AuthServiceImpl<T, B, E, L, R> {
+    pub fn new(db: T, hasher: B, jwt: E, logger: L, redis: R) -> Self {
         Self {
             db,
             hasher,
             jwt,
             logger,
+            redis,
         }
     }
 }
@@ -66,7 +69,8 @@ impl<
         B: Hasher + Send + Sync,
         E: Jwt + Send + Sync,
         L: Logger + Send + Sync,
-    > AuthService for AuthServiceImpl<T, B, E, L>
+        R: Redis + Send + Sync,
+    > AuthService for AuthServiceImpl<T, B, E, L, R>
 {
     async fn sign_in(&self, data: &SignInData) -> Result<Option<TokenData>, String> {
         self.logger
@@ -97,6 +101,7 @@ impl<
                         iat: Utc::now().timestamp() as usize,
                         exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,
                         nbf: Utc::now().timestamp() as usize,
+                        jti: uuid_v4(),
                         additional_claims: AdditionalClaims {
                             user_id: user_id.clone(),
                             kind: AUTH_TOKEN.to_string(),
@@ -109,6 +114,7 @@ impl<
                         iat: Utc::now().timestamp() as usize,
                         exp: (Utc::now() + Duration::weeks(4)).timestamp() as usize,
                         nbf: Utc::now().timestamp() as usize,
+                        jti: uuid_v4(),
                         additional_claims: AdditionalClaims {
                             user_id: user_id.clone(),
                             kind: REFRESH_TOKEN.to_string(),
@@ -142,8 +148,8 @@ impl<
         let row = self
             .db
             .query_one(
-                "INSERT INTO users (name, email, username, password) VALUES ($1, $2, $3, $4) RETURNING username",
-                &[&data.name, &data.email, &data.username, &self.hasher.hash(&data.password)],
+                "INSERT INTO users (name, username, password) VALUES ($1, $2, $3, $4) RETURNING username",
+                &[&data.name,  &data.username, &self.hasher.hash(&data.password)],
             )
             .await;
         match row {
@@ -158,6 +164,29 @@ impl<
                 Ok(None)
             }
         }
+    }
+
+    async fn sign_out(&self, token: &str, refresh_token: &str) -> Result<Option<String>, String> {
+        self.logger
+            .info("auth_service::sign_out", "sign out is initialized");
+        let jti = self
+            .jwt
+            .extract(token)
+            .expect("Failed to extract jti from token");
+        let refresh_jti = self
+            .jwt
+            .extract(refresh_token)
+            .expect("Failed to extract jti from token");
+        self.logger
+            .info("auth_service::sign_out", "inserting jti into redis");
+        self.redis
+            .set(&jti.jti, "true")
+            .expect("Failed to set jti in redis");
+        self.redis
+            .set(&refresh_jti.jti, "true")
+            .expect("Failed to set jti in redis");
+
+        Ok(Some("Successfully signed out".to_string()))
     }
 
     async fn gain_new_token(&self, old_token: &str) -> Result<Option<String>, String> {
@@ -175,6 +204,13 @@ impl<
 
             let old_claims = old_token_claims.unwrap();
 
+            // check if token is in blacklist
+            if self.redis.get(&old_claims.jti).is_ok() {
+                self.logger
+                    .info("auth_service::gain_new_token", "token is in blacklist");
+                return Ok(None);
+            }
+
             // Set expiration to 1 hour from now
             let expired = (Utc::now() + Duration::hours(1)).timestamp() as usize;
 
@@ -183,6 +219,7 @@ impl<
                 iat: Utc::now().timestamp() as usize,
                 exp: expired,
                 nbf: Utc::now().timestamp() as usize,
+                jti: old_claims.jti.clone(),
                 additional_claims: AdditionalClaims {
                     user_id: old_claims.additional_claims.user_id.clone(),
                     kind: old_claims.additional_claims.kind.clone(),
