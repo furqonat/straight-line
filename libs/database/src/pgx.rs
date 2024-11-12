@@ -46,12 +46,10 @@ impl Postgresql {
 
 #[async_trait]
 impl Database<PgRow> for Postgresql {
-    async fn query(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<PgRow>, tokio_postgres::Error> {
-        let rows = self.client.query(sql, params).await;
+    async fn query(&self, sql: &str, params: &Vec<&String>) -> Result<Vec<PgRow>, String> {
+        let param_refs: Vec<&(dyn ToSql + Sync)> =
+            params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        let rows = self.client.query(sql, &param_refs).await;
         match rows {
             Ok(rows) => {
                 let mut pg_rows = Vec::new();
@@ -62,15 +60,13 @@ impl Database<PgRow> for Postgresql {
                 }
                 Ok(pg_rows)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.to_string()),
         }
     }
-    async fn query_one(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<PgRow, tokio_postgres::Error> {
-        let row = self.client.query_one(sql, params).await;
+    async fn query_one(&self, sql: &str, params: &Vec<&String>) -> Result<PgRow, String> {
+        let param_refs: Vec<&(dyn ToSql + Sync)> =
+            params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        let row = self.client.query_one(sql, &param_refs).await;
         match row {
             Ok(row) => {
                 let mut rows = Vec::new();
@@ -79,15 +75,18 @@ impl Database<PgRow> for Postgresql {
                 }
                 Ok(PgRow { row: rows })
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.to_string()),
         }
     }
 
-    async fn execute(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, tokio_postgres::Error> {
-        return self.client.execute(sql, params).await;
+    async fn execute(&self, sql: &str, params: &Vec<&String>) -> Result<u64, String> {
+        let param_refs: Vec<&(dyn ToSql + Sync)> =
+            params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+
+        let result = self.client.execute(sql, &param_refs).await;
+        match result {
+            Ok(count) => Ok(count),
+            Err(e) => Err(e.to_string()),
+        }
     }
 }

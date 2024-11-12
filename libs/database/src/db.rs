@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use mockall::automock;
-use tokio_postgres::types::ToSql;
 
 #[automock]
 pub trait Row {}
@@ -11,21 +10,9 @@ pub trait Database<T>
 where
     T: Row,
 {
-    async fn query(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<T>, tokio_postgres::Error>;
+    async fn query(&self, sql: &str, params: &Vec<&String>) -> Result<Vec<T>, String>;
 
-    async fn query_one(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<T, tokio_postgres::Error>;
+    async fn query_one(&self, sql: &str, params: &Vec<&String>) -> Result<T, String>;
 
-    async fn execute(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, tokio_postgres::Error>;
+    async fn execute(&self, sql: &str, params: &Vec<&String>) -> Result<u64, String>;
 }
