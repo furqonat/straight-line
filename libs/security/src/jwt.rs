@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use jsonwebtoken::Header;
 use mockall::automock;
 use serde::{Deserialize, Serialize};
