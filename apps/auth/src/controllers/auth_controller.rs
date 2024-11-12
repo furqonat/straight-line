@@ -25,7 +25,7 @@ struct ResponseError {
 }
 
 pub fn auth_controller(config: &mut web::ServiceConfig) {
-    let refresh_middeware = middlewares::refresh_middleware::Middleware {
+    let refresh_middleware = middlewares::refresh_middleware::Middleware {
         roles: vec![utils::constants::REFRESH_TOKEN.to_string()],
     };
     config.service(
@@ -35,7 +35,7 @@ pub fn auth_controller(config: &mut web::ServiceConfig) {
             .route("/signout", web::get().to(sign_out_handler))
             .service(
                 web::scope("/refresh-token")
-                    .wrap(refresh_middeware)
+                    .wrap(refresh_middleware)
                     .route("", web::get().to(refresh_token_handler)),
             ),
     );
@@ -63,7 +63,7 @@ async fn sign_in_handler(
     data: web::Json<crate::services::auth_service::SignInData>,
     ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>, Log, RedisImpl>>,
 ) -> HttpResponse {
-    // TODO: add secure cookie and strict samesite
+    // TODO: add secure cookie and strict same site
     match ctrl.sign_in(&data).await {
         Ok(Some(token)) => {
             let cookie = Cookie::build("token", token.token.clone())
