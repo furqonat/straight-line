@@ -1,12 +1,28 @@
 use async_trait::async_trait;
 use security::env::{Env, EnvImpl};
-use tokio_postgres::{types::ToSql, NoTls, Row};
+use tokio_postgres::{types::ToSql, NoTls};
 
-use crate::db::Database;
+use crate::db::{self, Database};
 
 pub struct Postgresql {
     client: tokio_postgres::Client,
 }
+
+pub struct PgRow {
+    row: Vec<String>,
+}
+
+impl PgRow {
+    pub fn get(&self, index: usize) -> String {
+        self.row[index].clone()
+    }
+
+    pub fn new() -> Self {
+        PgRow { row: Vec::new() }
+    }
+}
+
+impl db::Row for PgRow {}
 
 impl Postgresql {
     pub async fn new(env: EnvImpl) -> Self {
@@ -29,27 +45,48 @@ impl Postgresql {
 }
 
 #[async_trait]
-impl Database for Postgresql {
-    async fn query(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, tokio_postgres::Error> {
-        return self.client.query(sql, params).await;
+impl Database<PgRow> for Postgresql {
+    async fn query(&self, sql: &str, params: &Vec<&String>) -> Result<Vec<PgRow>, String> {
+        let param_refs: Vec<&(dyn ToSql + Sync)> =
+            params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        let rows = self.client.query(sql, &param_refs).await;
+        match rows {
+            Ok(rows) => {
+                let mut pg_rows = Vec::new();
+                for (index, row) in rows.iter().enumerate() {
+                    pg_rows.push(PgRow {
+                        row: row.get(index),
+                    });
+                }
+                Ok(pg_rows)
+            }
+            Err(e) => Err(e.to_string()),
+        }
     }
-    async fn query_one(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, tokio_postgres::Error> {
-        return self.client.query_one(sql, params).await;
+    async fn query_one(&self, sql: &str, params: &Vec<&String>) -> Result<PgRow, String> {
+        let param_refs: Vec<&(dyn ToSql + Sync)> =
+            params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        let row = self.client.query_one(sql, &param_refs).await;
+        match row {
+            Ok(row) => {
+                let mut rows = Vec::new();
+                for index in 0..row.len() {
+                    rows.push(row.get(index));
+                }
+                Ok(PgRow { row: rows })
+            }
+            Err(e) => Err(e.to_string()),
+        }
     }
 
-    async fn execute(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, tokio_postgres::Error> {
-        return self.client.execute(sql, params).await;
+    async fn execute(&self, sql: &str, params: &Vec<&String>) -> Result<u64, String> {
+        let param_refs: Vec<&(dyn ToSql + Sync)> =
+            params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+
+        let result = self.client.execute(sql, &param_refs).await;
+        match result {
+            Ok(count) => Ok(count),
+            Err(e) => Err(e.to_string()),
+        }
     }
 }

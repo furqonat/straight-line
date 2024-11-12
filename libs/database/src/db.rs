@@ -1,23 +1,18 @@
 use async_trait::async_trait;
-use tokio_postgres::{types::ToSql, Row};
+use mockall::automock;
+
+#[automock]
+pub trait Row {}
 
 #[async_trait]
-pub trait Database {
-    async fn query(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, tokio_postgres::Error>;
+#[automock]
+pub trait Database<T>
+where
+    T: Row,
+{
+    async fn query(&self, sql: &str, params: &Vec<&String>) -> Result<Vec<T>, String>;
 
-    async fn query_one(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, tokio_postgres::Error>;
+    async fn query_one(&self, sql: &str, params: &Vec<&String>) -> Result<T, String>;
 
-    async fn execute(
-        &self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, tokio_postgres::Error>;
+    async fn execute(&self, sql: &str, params: &Vec<&String>) -> Result<u64, String>;
 }

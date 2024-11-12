@@ -1,4 +1,5 @@
 use colored::*;
+use mockall::automock;
 use std::fmt::{self, Display};
 
 pub enum LogLevel {
@@ -20,6 +21,7 @@ impl Display for LogLevel {
     }
 }
 
+#[automock]
 pub trait Logger {
     fn info(&self, tag: &str, message: &str);
     fn error(&self, tag: &str, message: &str);

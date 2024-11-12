@@ -1,6 +1,8 @@
+use std::vec;
+
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
-use database::{db::Database, redis::Redis};
+use database::{db::Database, pgx::PgRow, redis::RedisRow};
 use logger::logger::Logger;
 use security::{
     hasher::Hasher,
@@ -43,7 +45,8 @@ pub trait AuthService {
     async fn gain_new_token(&self, old_token: &str) -> Result<Option<String>, String>;
 }
 
-pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> {
+pub struct AuthServiceImpl<T: Database<PgRow>, B: Hasher, E: Jwt, L: Logger, R: Database<RedisRow>>
+{
     db: T,
     hasher: B,
     jwt: E,
@@ -51,7 +54,9 @@ pub struct AuthServiceImpl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> 
     redis: R,
 }
 
-impl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> AuthServiceImpl<T, B, E, L, R> {
+impl<T: Database<PgRow>, B: Hasher, E: Jwt, L: Logger, R: Database<RedisRow>>
+    AuthServiceImpl<T, B, E, L, R>
+{
     pub fn new(db: T, hasher: B, jwt: E, logger: L, redis: R) -> Self {
         Self {
             db,
@@ -65,11 +70,11 @@ impl<T: Database, B: Hasher, E: Jwt, L: Logger, R: Redis> AuthServiceImpl<T, B, 
 
 #[async_trait]
 impl<
-        T: Database + Send + Sync,
+        T: Database<PgRow> + Send + Sync,
         B: Hasher + Send + Sync,
         E: Jwt + Send + Sync,
         L: Logger + Send + Sync,
-        R: Redis + Send + Sync,
+        R: Database<RedisRow> + Send + Sync,
     > AuthService for AuthServiceImpl<T, B, E, L, R>
 {
     async fn sign_in(&self, data: &SignInData) -> Result<Option<TokenData>, String> {
@@ -79,7 +84,7 @@ impl<
             .db
             .query_one(
                 "SELECT id, username, password FROM users WHERE username = $1",
-                &[&data.username],
+                &vec![&data.username],
             )
             .await;
         match row {
@@ -148,8 +153,8 @@ impl<
         let row = self
             .db
             .query_one(
-                "INSERT INTO users (name, username, password) VALUES ($1, $2, $3, $4) RETURNING username",
-                &[&data.name,  &data.username, &self.hasher.hash(&data.password)],
+                "INSERT INTO users (name, username, password) VALUES ($1, $2, $3) RETURNING username",
+                &vec![&data.name,  &data.username, &self.hasher.hash(&data.password)],
             )
             .await;
         match row {
@@ -179,12 +184,14 @@ impl<
             .expect("Failed to extract jti from token");
         self.logger
             .info("auth_service::sign_out", "inserting jti into redis");
-        self.redis
-            .set(&jti.jti, "true")
-            .expect("Failed to set jti in redis");
-        self.redis
-            .set(&refresh_jti.jti, "true")
-            .expect("Failed to set jti in redis");
+        let _ = self
+            .redis
+            .execute(&jti.jti, &vec![&"true".to_string()])
+            .await;
+        let _ = self
+            .redis
+            .execute(&refresh_jti.jti, &vec![&"true".to_string()])
+            .await;
 
         Ok(Some("Successfully signed out".to_string()))
     }
@@ -205,10 +212,21 @@ impl<
             let old_claims = old_token_claims.unwrap();
 
             // check if token is in blacklist
-            if self.redis.get(&old_claims.jti).is_ok() {
-                self.logger
-                    .info("auth_service::gain_new_token", "token is in blacklist");
-                return Ok(None);
+            let result = self.redis.query_one(&old_claims.jti, &vec![]).await;
+            let msg = format!("current jti is {0}", old_claims.jti);
+            self.logger.info("auth_service::gain_new_token", &msg);
+            match result {
+                Ok(value) => {
+                    if !value.row.is_empty() {
+                        self.logger
+                            .info("auth_service::gain_new_token", "jti is in blacklist");
+                        return Ok(None);
+                    }
+                }
+                Err(e) => {
+                    let message = format!("jti not in redis {e}");
+                    self.logger.info("auth_service::gain_new_token", &message);
+                }
             }
 
             // Set expiration to 1 hour from now
