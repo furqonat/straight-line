@@ -1963,6 +1963,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "user"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "async-trait",
+ "chrono",
+ "database",
+ "futures",
+ "logger",
+ "security",
+ "serde",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
