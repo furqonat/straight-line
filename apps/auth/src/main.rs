@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(auth_service_data.clone()) // Share the auth service with handlers
             .configure(auth_controller) // Configure routes
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }
