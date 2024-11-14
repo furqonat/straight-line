@@ -9,7 +9,7 @@ use crate::{
 
 pub fn user_controller(config: &mut web::ServiceConfig) {
     let jwt_middleware = Middleware {
-        roles: vec!["admin".to_string()],
+        roles: vec!["auth_token".to_string()],
     };
     config.service(
         web::scope("/user")

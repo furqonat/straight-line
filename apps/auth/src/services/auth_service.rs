@@ -91,9 +91,9 @@ impl<
             Ok(row) => {
                 self.logger
                     .info("auth_service::sign_in", "user found in database");
-                let user_id: String = row.get(0);
-                let username: String = row.get(1);
-                let password: String = row.get(2);
+                let user_id: String = row.get(0).to_string();
+                let username: String = row.get(1).to_string();
+                let password: String = row.get(2).to_string();
                 self.logger
                     .info("auth_service::sign_in", "trying to verify password");
                 if self.hasher.verify(&data.password, &password) {
@@ -161,7 +161,7 @@ impl<
             Ok(row) => {
                 self.logger
                     .info("auth_service::sign_up", "user created in database");
-                Ok(Some(row.get(0)))
+                Ok(Some(row.get(0).to_string()))
             }
             Err(e) => {
                 let message = format!("an error occurred: {}", e);

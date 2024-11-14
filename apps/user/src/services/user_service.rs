@@ -1,6 +1,13 @@
+use async_trait::async_trait;
 use database::{db::Database, pgx::PgRow};
 use logger::logger::Logger;
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserResponse {
+    data: Option<Vec<User>>,
+    total: Option<i64>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct User {
@@ -22,9 +29,10 @@ pub struct QueryUser {
     offset: Option<u32>,
 }
 
+#[async_trait]
 pub trait UserService {
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, String>;
-    async fn get_users(&self, query: &QueryUser) -> Result<Vec<User>, String>;
+    async fn get_users(&self, query: &QueryUser) -> Result<UserResponse, String>;
     async fn update_user(&self, id: &str, user: &UpdateUser) -> Result<String, String>;
 }
 
@@ -39,7 +47,10 @@ impl<D: Database<PgRow>, L: Logger> UserServiceImpl<D, L> {
     }
 }
 
-impl<D: Database<PgRow>, L: Logger> UserService for UserServiceImpl<D, L> {
+#[async_trait]
+impl<D: Database<PgRow> + Send + Sync, L: Logger + Send + Sync> UserService
+    for UserServiceImpl<D, L>
+{
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, String> {
         let message = format!("querying user with id: {}", id);
         self.logger.info("user_service::get_user_by_id", &message);
@@ -67,21 +78,27 @@ impl<D: Database<PgRow>, L: Logger> UserService for UserServiceImpl<D, L> {
         }
     }
 
-    async fn get_users(&self, query: &QueryUser) -> Result<Vec<User>, String> {
+    async fn get_users(&self, query: &QueryUser) -> Result<UserResponse, String> {
         let limit = query.limit.unwrap_or(10);
         let offset = query.offset.unwrap_or(0);
         let mut sql = "SELECT id, name, username FROM users".to_string();
+        let mut total_sql = "SELECT COUNT(*)::TEXT as total FROM users".to_string();
         if let Some(username) = &query.q {
             sql = format!(
                 "{} WHERE username ILIKE '%{}%' OR name ILIKE '%{}%'",
                 sql, username, username
+            );
+            total_sql = format!(
+                "{} WHERE username ILIKE '%{}%' OR name ILIKE '%{}%'",
+                total_sql, username, username
             );
         }
         sql = format!("{} LIMIT {} OFFSET {}", sql, limit, offset);
         let message = format!("querying users with sql: {}", sql);
         self.logger.info("user_service::get_users", &message);
         let rows = self.db.query(&sql, &vec![]).await;
-        if rows.is_ok() {
+        let total_rows = self.db.query_one(&total_sql, &vec![]).await;
+        if rows.is_ok() && total_rows.is_ok() {
             let rows = rows.unwrap();
             let mut users: Vec<User> = Vec::new();
             for row in rows {
@@ -94,11 +111,20 @@ impl<D: Database<PgRow>, L: Logger> UserService for UserServiceImpl<D, L> {
                     username: username.to_string(),
                 });
             }
-            return Ok(users);
+            let total = total_rows.unwrap().get(0);
+            let result = UserResponse {
+                data: Some(users),
+                total: Some(total.parse().unwrap_or(0)),
+            };
+            return Ok(result);
         } else {
             let message = format!("users not found");
             self.logger.error("user_service::get_users", &message);
-            return Ok(vec![]);
+            let result = UserResponse {
+                data: Some(Vec::new()),
+                total: Some(0),
+            };
+            return Ok(result);
         }
     }
 

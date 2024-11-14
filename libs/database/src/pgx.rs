@@ -1,8 +1,7 @@
+use crate::db::{self, Database};
 use async_trait::async_trait;
 use security::env::{Env, EnvImpl};
 use tokio_postgres::{types::ToSql, NoTls};
-
-use crate::db::{self, Database};
 
 pub struct Postgresql {
     client: tokio_postgres::Client,
@@ -53,10 +52,12 @@ impl Database<PgRow> for Postgresql {
         match rows {
             Ok(rows) => {
                 let mut pg_rows = Vec::new();
-                for (index, row) in rows.iter().enumerate() {
-                    pg_rows.push(PgRow {
-                        row: row.get(index),
-                    });
+                for row in rows.iter() {
+                    let mut rw = Vec::new();
+                    for va in 0..row.len() {
+                        rw.push(row.get(va));
+                    }
+                    pg_rows.push(PgRow { row: rw });
                 }
                 Ok(pg_rows)
             }
