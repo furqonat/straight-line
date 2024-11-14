@@ -9,6 +9,12 @@ pub struct User {
     username: String,
 }
 
+#[derive(Deserialize, Debug, Serialize)]
+pub struct UpdateUser {
+    name: Option<String>,
+    username: Option<String>,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct QueryUser {
     q: Option<String>,
@@ -19,7 +25,7 @@ pub struct QueryUser {
 pub trait UserService {
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, String>;
     async fn get_users(&self, query: &QueryUser) -> Result<Vec<User>, String>;
-    async fn update_user(&self, id: &str, user: &User) -> Result<String, String>;
+    async fn update_user(&self, id: &str, user: &UpdateUser) -> Result<String, String>;
 }
 
 pub struct UserServiceImpl<D: Database<PgRow>, L: Logger> {
@@ -96,19 +102,21 @@ impl<D: Database<PgRow>, L: Logger> UserService for UserServiceImpl<D, L> {
         }
     }
 
-    async fn update_user(&self, id: &str, user: &User) -> Result<String, String> {
+    async fn update_user(&self, id: &str, user: &UpdateUser) -> Result<String, String> {
         let message = format!("updating user with id: {}", id);
         self.logger.info("user_service::update_user", &message);
         let mut sql = "UPDATE users".to_string();
-        if user.name != "" {
+        if Some(&user.name) != None && &user.username.clone().unwrap() != "" {
             sql = format!("{} SET name = $1,", sql);
         }
-        if user.username != "" {
+        if Some(&user.username) != None && &user.username.clone().unwrap() != "" {
             sql = format!("{} username = $2", sql);
         }
         sql = format!("{} WHERE id = $3", sql);
         let id = id.to_string();
-        let params = vec![&user.name, &user.username, &id];
+        let name = user.name.clone().unwrap().to_string();
+        let username = user.username.clone().unwrap().to_string();
+        let params = vec![&name, &username, &id];
         let affected_rows = self.db.execute(&sql, &params).await;
         if affected_rows.is_ok() {
             let affected_rows = affected_rows.unwrap();
