@@ -1,6 +1,6 @@
 # Straight-Line: Realtime Community Chat Application
 
-Straight-Line just messaging application without any data collection. This project leverages **Rust** for the backend, **React** with **TypeScript** for the frontend. Docker and Docker Compose are used for containerization, and the project follows a **monorepo** structure with **Nx** for efficient management.
+Straight-Line like any other realtime chat application. This project leverages **Rust** for the backend, **React** with **TypeScript** for the frontend. Docker and Docker Compose are used for containerization, and the project follows a **monorepo** structure with **Nx** for efficient management.
 
 ## Tech Stack
 
@@ -38,5 +38,5 @@ pnpm install
 3. Build and run the application with Docker Compose:
 
 ```bash
-docker compose up --build
+docker compose up
 ```
