@@ -72,7 +72,7 @@ where
             );
 
             // Try to get the Authorization-refresh header
-            let token_header = req.headers().get("Authorization-refresh");
+            let token_header = extract_token(&req);
 
             if token_header.is_none() {
                 self.logger.error(
@@ -84,20 +84,9 @@ where
                 ))));
             }
 
-            let token_str = token_header.unwrap().to_str();
             // split Bearer from token
-            let token_str = token_str.map(|s| s.split("Bearer ").collect::<Vec<_>>()[1]);
-            if token_str.is_err() {
-                self.logger.error(
-                    "RefreshTokenMiddleware::call",
-                    "RefreshTokenMiddleware: invalid token format",
-                );
-                return Box::pin(ready(Err(actix_web::error::ErrorUnauthorized(
-                    "Unauthorized: Invalid token format",
-                ))));
-            }
 
-            let token = token_str.unwrap();
+            let token = token_header.unwrap();
 
             // Validate JWT token
             let claims = self.jwt.extract(&token);
@@ -162,4 +151,22 @@ fn roles_is_valid(roles: &Vec<String>, role: &str) -> bool {
         }
     }
     return false;
+}
+
+fn extract_token(headers: &ServiceRequest) -> Option<String> {
+    let token_header = headers.headers().get("Authorization-refresh");
+    let token = token_header
+        .map(|s| s.to_str().unwrap().split("Bearer ").collect::<Vec<_>>()[1].to_string());
+    let cookie = headers.cookie("refresh_token");
+    let value = cookie.map(|s| s.value().to_string());
+    if token_header.is_none() || value.is_none() {
+        return None;
+    }
+    if token_header.is_some() {
+        return Some(token.unwrap());
+    }
+    if value.is_some() {
+        return Some(value.unwrap());
+    }
+    None
 }
