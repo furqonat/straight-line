@@ -8,7 +8,7 @@ use security::{env::EnvImpl, hasher::Bcrypt, jwt::JwtImpl};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    middlewares,
+    middlewares::{self},
     services::auth_service::{AuthService, AuthServiceImpl},
     utils,
 };
@@ -28,6 +28,9 @@ pub fn auth_controller(config: &mut web::ServiceConfig) {
     let refresh_middleware = middlewares::refresh_middleware::Middleware {
         roles: vec![utils::constants::REFRESH_TOKEN.to_string()],
     };
+    let jwt_middleware = middlewares::jwt_middleware::Middleware {
+        roles: vec![utils::constants::AUTH_TOKEN.to_string()],
+    };
     config.service(
         web::scope("/auth")
             .route("/signup", web::post().to(sign_up_handler))
@@ -37,6 +40,11 @@ pub fn auth_controller(config: &mut web::ServiceConfig) {
                 web::scope("/refresh-token")
                     .wrap(refresh_middleware)
                     .route("", web::get().to(refresh_token_handler)),
+            )
+            .service(
+                web::scope("/token")
+                    .wrap(jwt_middleware)
+                    .route("", web::get().to(get_token_handler)),
             ),
     );
 }
@@ -151,6 +159,22 @@ async fn refresh_token_handler(
                 message: format!("Error: {}", err),
             }),
         }
+    } else {
+        HttpResponse::BadRequest().json(ResponseError {
+            message: "Token not found in request".to_string(),
+        })
+    }
+}
+
+async fn get_token_handler(
+    _ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>, Log, RedisImpl>>,
+    req: HttpRequest,
+) -> HttpResponse {
+    if let Some(jwt_token) = req.extensions().get::<String>() {
+        HttpResponse::Ok().json(ResponseOk {
+            data: Some(jwt_token.clone()),
+            message: "Successfully got token".to_string(),
+        })
     } else {
         HttpResponse::BadRequest().json(ResponseError {
             message: "Token not found in request".to_string(),
