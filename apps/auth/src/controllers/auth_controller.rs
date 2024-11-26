@@ -138,8 +138,8 @@ async fn refresh_token_handler(
     ctrl: web::Data<AuthServiceImpl<Postgresql, Bcrypt, JwtImpl<EnvImpl>, Log, RedisImpl>>,
     req: HttpRequest,
 ) -> HttpResponse {
-    if let Some(token) = req.extensions().get::<String>() {
-        match ctrl.gain_new_token(token).await {
+    if let Some(refresh_token) = req.extensions().get::<String>() {
+        match ctrl.gain_new_token(refresh_token).await {
             Ok(Some(new_token)) => HttpResponse::Ok().json(ResponseOk {
                 data: Some(new_token),
                 message: "Successfully refreshed token".to_string(),

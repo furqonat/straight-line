@@ -86,10 +86,10 @@ where
 
             // split Bearer from token
 
-            let token = token_header.unwrap();
+            let refresh_token = token_header.unwrap();
 
             // Validate JWT token
-            let claims = self.jwt.extract(&token);
+            let claims = self.jwt.extract(&refresh_token);
             if claims.is_none() {
                 self.logger.error(
                     "RefreshTokenMiddleware::call",
@@ -130,7 +130,7 @@ where
             );
 
             // Attach token to request extensions for future use
-            req.extensions_mut().insert(token.to_string());
+            req.extensions_mut().insert(refresh_token.to_string());
         }
 
         // Continue with the request
